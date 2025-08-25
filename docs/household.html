@@ -42,7 +42,7 @@
   </main>
 
   <!-- Create Household Modal -->
-  <!-- use inline style to *truly* hide overlay so it can't eat clicks -->
+  <!-- Truly hidden when closed so it can't intercept clicks -->
   <div id="hhModal" class="fixed inset-0 bg-black/40 items-center justify-center p-4" style="display:none">
     <div class="bg-white w-full max-w-xl rounded-2xl p-4">
       <div class="flex items-center justify-between">
@@ -236,7 +236,7 @@
       });
     }
 
-    // 8) Card renderer (clickable div instead of anchor)
+    // 8) Card renderer -> use data attribute, no inline onclick
     function card(id, hh){
       const city = [hh?.address?.city, hh?.address?.state].filter(Boolean).join(", ");
       const tags = (hh.tags||[]).slice(0,4).map(chip).join(" ");
@@ -246,8 +246,8 @@
       }).join(" ");
 
       return `
-      <div onclick="location.href='./household.html?id=${encodeURIComponent(id)}'"
-           class="cursor-pointer bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition">
+      <div class="cursor-pointer bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition"
+           data-hhid="${id}" role="button" tabindex="0">
         <div class="flex items-center justify-between gap-3">
           <h3 class="font-semibold truncate" title="${hh.displayName||'Household'}">
             ${hh.displayName || "Household"}
@@ -281,14 +281,30 @@
     qEl.addEventListener("input", render);
     odEl.addEventListener("change", render);
 
-    // 11) Add household modal handlers (use style.display to avoid overlay issues)
+    // 11) Grid-level navigation (event delegation)
+    grid.addEventListener("click", (e) => {
+      const card = e.target.closest("[data-hhid]");
+      if (!card) return;
+      const id = card.getAttribute("data-hhid");
+      location.href = `./household.html?id=${encodeURIComponent(id)}`;
+    });
+    grid.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const card = e.target.closest("[data-hhid]");
+      if (!card) return;
+      e.preventDefault();
+      const id = card.getAttribute("data-hhid");
+      location.href = `./household.html?id=${encodeURIComponent(id)}`;
+    });
+
+    // 12) Modal handlers (use style.display to avoid overlay eating clicks)
     function openModal(){ hhModal.style.display = 'flex'; form.reset(); autoName = true; }
     function closeModal(){ hhModal.style.display = 'none'; }
     openAddBtn.onclick = openModal;
     closeAddBtn.onclick = closeModal;
     cancelCreateBtn.onclick = closeModal;
 
-    // 12) Create household + optional first person (no role needed for single person)
+    // 13) Create household + optional first person (no role for single person)
     form.onsubmit = async (e) => {
       e.preventDefault();
       errEl.textContent = ""; statusEl.textContent = "Creating household…";
