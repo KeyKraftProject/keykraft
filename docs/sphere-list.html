@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Keykraft • Sphere (Households)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <!-- Header -->
+  <header class="bg-white border-b">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+      <h1 class="text-xl font-semibold">Sphere</h1>
+      <nav class="text-sm">
+        <!-- Optional: point to your detail page -->
+        <a class="underline opacity-80" href="./household.html?id=hh_demo">Open demo household</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Toolbar -->
+  <main class="max-w-6xl mx-auto p-4 md:p-6">
+    <div class="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 mb-4">
+      <label class="block">
+        <span class="text-sm">Search</span>
+        <input id="q" class="mt-1 w-full md:w-96 rounded-lg border px-3 py-2" placeholder="Household, member, city, tag…" />
+      </label>
+      <label class="block">
+        <span class="text-sm">Overdue only</span>
+        <input id="overdue" type="checkbox" class="ml-2 align-middle">
+      </label>
+    </div>
+
+    <!-- Grid -->
+    <div id="grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+    <!-- Errors -->
+    <p id="error" class="mt-6 text-sm text-red-700 hidden"></p>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // 1) 🔧 Replace with your Firebase config
+    const firebaseConfig = {
+      apiKey:      "YOUR_API_KEY",
+      authDomain:  "YOUR_PROJECT.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+      projectId:   "YOUR_PROJECT",
+      appId:       "YOUR_APP_ID"
+    };
+
+    // 2) Init
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    // 3) UI handles
+    const errEl  = document.getElementById("error");
+    const grid   = document.getElementById("grid");
+    const qEl    = document.getElementById("q");
+    const odEl   = document.getElementById("overdue");
+
+    // 4) Helpers
+    const today = new Date();
+    const toISO = (d)=> d.toISOString().slice(0,10);
+    function fmt(d){
+      if (!d) return "—";
+      const [y,m,day] = (d||"").split("-").map(Number);
+      return (!y||!m||!day) ? d : `${m}/${day}/${y}`;
+    }
+    function chip(txt){
+      return `<span class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border">${txt}</span>`;
+    }
+
+    // 5) Load households
+    let households = {};
+    async function loadHouseholds(){
+      try {
+        const snap = await get(ref(db, "households"));
+        households = snap.exists() ? snap.val() : {};
+        // preload member name chips (best-effort)
+        await hydrateMemberNames(households);
+        render();
+      } catch (e) {
+        errEl.textContent = e.message;
+        errEl.classList.remove("hidden");
+      }
+    }
+
+    // 6) Member names: prefer cached names; otherwise fetch a few person records
+    async function hydrateMemberNames(hhObj){
+      // If you keep a cache like household.memberNamesCache = ["Jamie Richards", ...]
+      // we'll use it. Otherwise, fetch up to 4 member Person records for display.
+      const entries = Object.entries(hhObj || {});
+      for (const [id, hh] of entries) {
+        if (Array.isArray(hh.memberNamesCache) && hh.memberNamesCache.length){
+          hh._memberNames = hh.memberNamesCache;
+          continue;
+        }
+        const members = Object.entries(hh.members || {}).slice(0,4);
+        const names = [];
+        for (const [personId] of members) {
+          try {
+            const ps = await get(child(ref(db), `people/${personId}`));
+            if (ps.exists()) {
+              const p = ps.val();
+              const first = p.preferredName || p.firstName || "";
+              const last  = p.lastName || "";
+              const full  = `${first} ${last}`.trim();
+              if (full) names.push(full);
+            }
+          } catch { /* ignore */ }
+        }
+        hh._memberNames = names;
+      }
+    }
+
+    // 7) Filtering + sorting
+    function matches(hh, q, overdueOnly){
+      q = (q||"").trim().toLowerCase();
+      if (overdueOnly){
+        const next = hh.nextSuggestedTouch;
+        if (!next || next >= toISO(today)) return false;
+      }
+      if (!q) return true;
+
+      const addr = hh.address ? [hh.address.city, hh.address.state].filter(Boolean).join(" ") : "";
+      const tags = (hh.tags || []).join(" ");
+      const members = (hh._memberNames || []).join(" ");
+      const hay = [hh.displayName, addr, tags, members].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    }
+
+    function sortEntries(arr){
+      return arr.sort((a,b)=>{
+        const an = a[1].nextSuggestedTouch || "9999-12-31";
+        const bn = b[1].nextSuggestedTouch || "9999-12-31";
+        if (an !== bn) return an < bn ? -1 : 1;
+        const aname = (a[1].displayName||"").toLowerCase();
+        const bname = (b[1].displayName||"").toLowerCase();
+        return aname.localeCompare(bname);
+      });
+    }
+
+    // 8) Card renderer
+    function card(id, hh){
+      const city = [hh?.address?.city, hh?.address?.state].filter(Boolean).join(", ");
+      const tags = (hh.tags||[]).slice(0,4).map(chip).join(" ");
+      const members = (hh._memberNames||[]).slice(0,4).map(n=>{
+        const first = n.split(" ")[0] || n; // show first name as chip
+        return chip(first);
+      }).join(" ");
+
+      return `
+      <a href="./household.html?id=${encodeURIComponent(id)}"
+         class="block bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition">
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="font-semibold truncate" title="${hh.displayName||'Household'}">
+            ${hh.displayName || "Household"}
+          </h3>
+          <span class="text-xs px-2 py-1 rounded bg-slate-100 border">Household</span>
+        </div>
+        <div class="text-sm text-slate-600 mt-1">${city || "—"}</div>
+
+        <div class="mt-3 flex flex-wrap gap-1.5">${members || ""}</div>
+        <div class="mt-2 flex flex-wrap gap-1.5">${tags}</div>
+
+        <div class="mt-3 text-xs text-slate-600">
+          <div><span class="font-medium">Last:</span> ${fmt(hh.lastTouch)}</div>
+          <div><span class="font-medium">Next:</span> ${fmt(hh.nextSuggestedTouch)}</div>
+        </div>
+      </a>`;
+    }
+
+    // 9) Render
+    function render(){
+      const q = qEl.value;
+      const overdueOnly = odEl.checked;
+
+      const entries = Object.entries(households || {});
+      const filtered = entries.filter(([id,hh])=> matches(hh, q, overdueOnly));
+      const sorted = sortEntries(filtered);
+
+      grid.innerHTML = sorted.map(([id,hh]) => card(id, hh)).join("") ||
+        `<div class="col-span-full text-slate-600">No households match your filters.</div>`;
+    }
+
+    // 10) Wire up filters
+    qEl.addEventListener("input", render);
+    odEl.addEventListener("change", render);
+
+    // Go!
+    loadHouseholds();
+  </script>
+</body>
+</html>
