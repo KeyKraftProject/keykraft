@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Keykraft • Household</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <header class="bg-white border-b">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="./sphere-list.html" class="text-sm underline">← Sphere</a>
+      <h1 class="text-lg font-semibold">Household</h1>
+      <span></span>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto p-4 md:p-6">
+    <section id="hhCard" class="bg-white rounded-2xl border shadow-sm p-5 md:p-6">
+      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div>
+          <h2 id="hhName" class="text-2xl font-semibold">Loading…</h2>
+          <p id="hhAddr" class="text-sm text-slate-600 mt-1"></p>
+          <div id="hhTags" class="mt-2 flex flex-wrap gap-2"></div>
+        </div>
+        <div class="text-sm text-slate-700">
+          <div><span class="font-medium">Cadence:</span> <span id="hhCadence">—</span></div>
+          <div><span class="font-medium">Last touch:</span> <span id="hhLast">—</span></div>
+          <div><span class="font-medium">Next suggested:</span> <span id="hhNext">—</span></div>
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <h3 class="font-semibold mb-2">Notes</h3>
+        <p id="hhNotes" class="text-sm text-slate-700 bg-slate-50 rounded-lg p-3 min-h-[3rem]">—</p>
+      </div>
+    </section>
+
+    <section class="mt-6">
+      <h3 class="font-semibold mb-3">Members</h3>
+      <div id="membersGrid" class="grid sm:grid-cols-2 gap-4"></div>
+    </section>
+
+    <section class="mt-6">
+      <h3 class="font-semibold mb-3">Recent Interactions</h3>
+      <ul id="hhInteractions" class="space-y-2"></ul>
+    </section>
+
+    <p id="error" class="mt-6 text-sm text-red-700 hidden"></p>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, child, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // Read ?id=... from URL (e.g., ?id=hh_demo)
+    const params = new URLSearchParams(location.search);
+    const hhId = params.get("id");
+    const errEl = document.getElementById("error");
+    if (!hhId) {
+      errEl.textContent = "Missing household id. Try: household.html?id=hh_demo";
+      errEl.classList.remove("hidden");
+    }
+
+    // Your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyAMio_EgHUFYi6-MxwlCdWoXEBsGxPPccU",
+      authDomain: "keykraft-1fca4.firebaseapp.com",
+      databaseURL: "https://keykraft-1fca4-default-rtdb.firebaseio.com",
+      projectId: "keykraft-1fca4",
+      storageBucket: "keykraft-1fca4.firebasestorage.app",
+      messagingSenderId: "525295374203",
+      appId: "1:525295374203:web:29a0484fc9e8b8ade1f7de",
+      measurementId: "G-SJLXJS3784"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    // Helpers
+    const fmtDate = (d) => {
+      if (!d) return "—";
+      const [y,m,day] = (d||"").split("-").map(Number);
+      return (!y||!m||!day) ? d : `${m}/${day}/${y}`;
+    };
+    const chip = (txt) =>
+      `<span class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border">${txt}</span>`;
+    const fmtAddr = (a={}) =>
+      [a.street, a.unit, [a.city, a.state].filter(Boolean).join(", "), a.zip]
+        .filter(Boolean).join(", ");
+
+    // Renderers
+    function renderHousehold(hh){
+      document.getElementById("hhName").textContent = hh.displayName || "Household";
+      document.getElementById("hhAddr").textContent = fmtAddr(hh.address);
+      document.getElementById("hhCadence").textContent = hh.cadenceDays ? `${hh.cadenceDays} days` : "—";
+      document.getElementById("hhLast").textContent = fmtDate(hh.lastTouch);
+      document.getElementById("hhNext").textContent = fmtDate(hh.nextSuggestedTouch);
+      document.getElementById("hhTags").innerHTML = (hh.tags||[]).slice(0,8).map(chip).join(" ");
+      document.getElementById("hhNotes").textContent = hh.notes || "—";
+
+      const interactions = (hh.interactions||[]).slice().sort((a,b)=> (a.date<b.date?1:-1));
+      document.getElementById("hhInteractions").innerHTML =
+        interactions.length
+          ? interactions.map(ix => `
+              <li class="p-3 bg-white border rounded-lg">
+                <div class="text-xs text-slate-500">${fmtDate(ix.date)} • ${ix.type||"touch"}</div>
+                <div class="text-sm">${ix.note||""}</div>
+              </li>`).join("")
+          : `<li class="text-sm text-slate-600">No interactions yet.</li>`;
+    }
+
+    function renderMembers(list){
+      const grid = document.getElementById("membersGrid");
+      if (!list.length){
+        grid.innerHTML = `<div class="text-slate-600">No members yet.</div>`;
+        return;
+      }
+      grid.innerHTML = list.map(p => {
+        const name = [p.preferredName||p.firstName, p.lastName].filter(Boolean).join(" ");
+        const phones = (p.phones||[]).map(ph => `<div>${ph.label||"phone"}: <a class="underline" href="tel:${ph.value}">${ph.value}</a></div>`).join("");
+        const emails = (p.emails||[]).map(em => `<div>${em.label||"email"}: <a class="underline" href="mailto:${em.value}">${em.value}</a></div>`).join("");
+        const interests = (p.interests||[]).slice(0,6).map(chip).join(" ");
+        return `
+          <div class="bg-white border rounded-2xl p-4">
+            <div class="flex items-center justify-between">
+              <h4 class="font-semibold">${name || "Unnamed"}</h4>
+              <span class="text-xs px-2 py-1 rounded bg-slate-100 border">Person</span>
+            </div>
+            <div class="text-sm text-slate-600 mt-1">Birthday: ${fmtDate(p.birthday)}</div>
+            <div class="text-sm mt-2 space-y-1">
+              ${phones || ""}
+              ${emails || ""}
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1.5">${interests}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Load data
+    async function load(){
+      try {
+        const hhSnap = await get(child(ref(db), `households/${hhId}`));
+        if (!hhSnap.exists()) throw new Error(`Household "${hhId}" not found.`);
+        const hh = hhSnap.val();
+
+        // Fetch people (use cache if present)
+        const memberIds = Object.keys(hh.members||{});
+        const people = await Promise.all(memberIds.map(async pid => {
+          try {
+            const ps = await get(child(ref(db), `people/${pid}`));
+            return ps.exists() ? { id: pid, ...ps.val() } : null;
+          } catch { return null; }
+        }));
+        const members = people.filter(Boolean);
+
+        renderHousehold(hh);
+        renderMembers(members);
+      } catch (e) {
+        errEl.textContent = e.message;
+        errEl.classList.remove("hidden");
+      }
+    }
+
+    if (hhId) load();
+  </script>
+</body>
+</html>
