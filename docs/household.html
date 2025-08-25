@@ -42,7 +42,8 @@
   </main>
 
   <!-- Create Household Modal -->
-  <div id="hhModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4">
+  <!-- use inline style to *truly* hide overlay so it can't eat clicks -->
+  <div id="hhModal" class="fixed inset-0 bg-black/40 items-center justify-center p-4" style="display:none">
     <div class="bg-white w-full max-w-xl rounded-2xl p-4">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">Create household</h2>
@@ -78,7 +79,7 @@
         <hr class="my-2"/>
 
         <!-- Optional first member -->
-        <details class="rounded-lg bg-slate-50 p-3">
+        <details open class="rounded-lg bg-slate-50 p-3">
           <summary class="cursor-pointer text-sm font-medium">Add first person (optional)</summary>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
             <label class="text-sm">First name
@@ -96,14 +97,7 @@
             <label class="text-sm">Birthday (YYYY-MM-DD)
               <input id="new_p_bday" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="1986-05-17"/>
             </label>
-            <label class="text-sm">Role
-              <select id="new_p_role" class="mt-1 w-full rounded-lg border px-3 py-2">
-                <option value="partner">partner</option>
-                <option value="child">child</option>
-                <option value="roommate">roommate</option>
-                <option value="other">other</option>
-              </select>
-            </label>
+            <!-- role removed for 1-person households -->
           </div>
         </details>
 
@@ -145,8 +139,22 @@
     const openAddBtn = document.getElementById("openAddBtn");
     const closeAddBtn = document.getElementById("closeAddBtn");
     const cancelCreateBtn = document.getElementById("cancelCreateBtn");
-    const modal = document.getElementById("hhModal");
+    const hhModal = document.getElementById("hhModal");
     const form  = document.getElementById("hhCreateForm");
+
+    // Household name auto-fill from person first+last (until user types their own)
+    const hhNameEl = document.getElementById("new_hh_name");
+    const pFirstEl = document.getElementById("new_p_first");
+    const pLastEl  = document.getElementById("new_p_last");
+    let autoName = true;
+    hhNameEl.addEventListener("input", () => { autoName = hhNameEl.value.trim() === ""; });
+    function syncHhNameFromPerson(){
+      if (!autoName) return;
+      const nm = `${(pFirstEl.value||"").trim()} ${(pLastEl.value||"").trim()}`.trim();
+      hhNameEl.value = nm;
+    }
+    pFirstEl.addEventListener("input", syncHhNameFromPerson);
+    pLastEl.addEventListener("input",  syncHhNameFromPerson);
 
     // 4) Helpers
     const today = new Date();
@@ -228,7 +236,7 @@
       });
     }
 
-    // 8) Card renderer
+    // 8) Card renderer (clickable div instead of anchor)
     function card(id, hh){
       const city = [hh?.address?.city, hh?.address?.state].filter(Boolean).join(", ");
       const tags = (hh.tags||[]).slice(0,4).map(chip).join(" ");
@@ -238,8 +246,8 @@
       }).join(" ");
 
       return `
-      <a href="./household.html?id=${encodeURIComponent(id)}"
-         class="block bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition">
+      <div onclick="location.href='./household.html?id=${encodeURIComponent(id)}'"
+           class="cursor-pointer bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition">
         <div class="flex items-center justify-between gap-3">
           <h3 class="font-semibold truncate" title="${hh.displayName||'Household'}">
             ${hh.displayName || "Household"}
@@ -253,7 +261,7 @@
           <div><span class="font-medium">Last:</span> ${fmt(hh.lastTouch)}</div>
           <div><span class="font-medium">Next:</span> ${fmt(hh.nextSuggestedTouch)}</div>
         </div>
-      </a>`;
+      </div>`;
     }
 
     // 9) Render
@@ -273,15 +281,14 @@
     qEl.addEventListener("input", render);
     odEl.addEventListener("change", render);
 
-    // 11) Add household modal handlers
-    function openModal(){ hhModal.classList.remove("hidden"); hhModal.classList.add("flex"); }
-    function closeModal(){ hhModal.classList.add("hidden"); hhModal.classList.remove("flex"); form.reset(); }
-    const hhModal = document.getElementById("hhModal");
+    // 11) Add household modal handlers (use style.display to avoid overlay issues)
+    function openModal(){ hhModal.style.display = 'flex'; form.reset(); autoName = true; }
+    function closeModal(){ hhModal.style.display = 'none'; }
     openAddBtn.onclick = openModal;
     closeAddBtn.onclick = closeModal;
     cancelCreateBtn.onclick = closeModal;
 
-    // 12) Create household + optional first person
+    // 12) Create household + optional first person (no role needed for single person)
     form.onsubmit = async (e) => {
       e.preventDefault();
       errEl.textContent = ""; statusEl.textContent = "Creating household…";
@@ -301,7 +308,6 @@
       const pMob   = document.getElementById("new_p_mobile").value.trim();
       const pEmail = document.getElementById("new_p_email").value.trim();
       const pBday  = document.getElementById("new_p_bday").value.trim();
-      const pRole  = document.getElementById("new_p_role").value;
 
       if (!hhName && !(pFirst || pLast)) {
         errEl.textContent = "Please provide a household name, or at least the first person’s name.";
@@ -328,7 +334,7 @@
 
         await set(hhRef, hhData);
 
-        // Optionally create first person and link
+        // Optionally create first person and link (no role; mark primary)
         let memberNames = [];
         if (pFirst || pLast || pMob || pEmail || pBday) {
           const pRef = push(ref(db, "people"));
@@ -345,7 +351,7 @@
 
           memberNames = [`${pFirst} ${pLast}`.trim()].filter(Boolean);
           await update(ref(db), {
-            [`/households/${hhId}/members/${pid}`]: { role: pRole, isPrimary: true },
+            [`/households/${hhId}/members/${pid}`]: { isPrimary: true },
             [`/households/${hhId}/memberNamesCache`]: memberNames
           });
         }
