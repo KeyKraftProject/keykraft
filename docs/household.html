@@ -236,18 +236,18 @@
       });
     }
 
-    // 8) Card renderer -> use data attribute, no inline onclick
+    // 8) Card renderer -> anchor (most reliable navigation)
     function card(id, hh){
-      const city = [hh?.address?.city, hh?.address?.state].filter(Boolean).join(", ");
+      const city = [hh && hh.address && hh.address.city, hh && hh.address && hh.address.state].filter(Boolean).join(", ");
       const tags = (hh.tags||[]).slice(0,4).map(chip).join(" ");
       const members = (hh._memberNames||[]).slice(0,4).map(n=>{
-        const first = n.split(" ")[0] || n;
+        const first = (n || "").split(" ")[0] || n;
         return chip(first);
       }).join(" ");
 
       return `
-      <div class="cursor-pointer bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition"
-           data-hhid="${id}" role="button" tabindex="0">
+      <a href="./household.html?id=${encodeURIComponent(id)}"
+         class="block bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition">
         <div class="flex items-center justify-between gap-3">
           <h3 class="font-semibold truncate" title="${hh.displayName||'Household'}">
             ${hh.displayName || "Household"}
@@ -261,7 +261,7 @@
           <div><span class="font-medium">Last:</span> ${fmt(hh.lastTouch)}</div>
           <div><span class="font-medium">Next:</span> ${fmt(hh.nextSuggestedTouch)}</div>
         </div>
-      </div>`;
+      </a>`;
     }
 
     // 9) Render
@@ -281,30 +281,14 @@
     qEl.addEventListener("input", render);
     odEl.addEventListener("change", render);
 
-    // 11) Grid-level navigation (event delegation)
-    grid.addEventListener("click", (e) => {
-      const card = e.target.closest("[data-hhid]");
-      if (!card) return;
-      const id = card.getAttribute("data-hhid");
-      location.href = `./household.html?id=${encodeURIComponent(id)}`;
-    });
-    grid.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter" && e.key !== " ") return;
-      const card = e.target.closest("[data-hhid]");
-      if (!card) return;
-      e.preventDefault();
-      const id = card.getAttribute("data-hhid");
-      location.href = `./household.html?id=${encodeURIComponent(id)}`;
-    });
-
-    // 12) Modal handlers (use style.display to avoid overlay eating clicks)
+    // 11) Modal handlers (use style.display to avoid overlay eating clicks)
     function openModal(){ hhModal.style.display = 'flex'; form.reset(); autoName = true; }
     function closeModal(){ hhModal.style.display = 'none'; }
     openAddBtn.onclick = openModal;
     closeAddBtn.onclick = closeModal;
     cancelCreateBtn.onclick = closeModal;
 
-    // 13) Create household + optional first person (no role for single person)
+    // 12) Create household + optional first person (no role for single person)
     form.onsubmit = async (e) => {
       e.preventDefault();
       errEl.textContent = ""; statusEl.textContent = "Creating household…";
