@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Keykraft • Sphere (Households)</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Safety belt: when the modal is hidden, make it inert */
+    #hhModal[hidden] { display: none !important; pointer-events: none !important; }
+  </style>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900">
   <!-- Header -->
@@ -28,6 +32,9 @@
         <span class="text-sm">Overdue only</span>
         <input id="overdue" type="checkbox" class="ml-2 align-middle">
       </label>
+
+      <div class="md:ml-auto"></div>
+      <button id="openAddBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">+ Add household</button>
     </div>
 
     <!-- Grid -->
@@ -35,13 +42,81 @@
 
     <!-- Errors -->
     <p id="error" class="mt-6 text-sm text-red-700 hidden"></p>
+    <p id="status" class="mt-2 text-sm text-slate-700"></p>
   </main>
+
+  <!-- Create Household Modal -->
+  <div id="hhModal" class="fixed inset-0 z-50 bg-black/40 items-center justify-center p-4" hidden>
+    <div class="bg-white w-full max-w-xl rounded-2xl p-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Create household</h2>
+        <button id="closeAddBtn" class="text-slate-600">✕</button>
+      </div>
+
+      <form id="hhCreateForm" class="mt-4 space-y-3">
+        <!-- Household basics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label class="text-sm">Household name
+            <input id="new_hh_name" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Richards–Brown Household"/>
+          </label>
+          <label class="text-sm">Cadence (days)
+            <input id="new_cadence" type="number" min="0" value="45" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+          </label>
+          <label class="text-sm md:col-span-2">Street
+            <input id="new_street" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+          </label>
+          <label class="text-sm">City
+            <input id="new_city" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+          </label>
+          <label class="text-sm">State
+            <input id="new_state" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+          </label>
+          <label class="text-sm">ZIP
+            <input id="new_zip" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+          </label>
+          <label class="text-sm md:col-span-2">Tags (comma or semicolon)
+            <input id="new_tags" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="north_shore;newsletter"/>
+          </label>
+        </div>
+
+        <hr class="my-2"/>
+
+        <!-- Optional first member -->
+        <details open class="rounded-lg bg-slate-50 p-3">
+          <summary class="cursor-pointer text-sm font-medium">Add first person (optional)</summary>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            <label class="text-sm">First name
+              <input id="new_p_first" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+            </label>
+            <label class="text-sm">Last name
+              <input id="new_p_last" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+            </label>
+            <label class="text-sm">Mobile
+              <input id="new_p_mobile" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="+14145550123 or (414) 555-0123"/>
+            </label>
+            <label class="text-sm">Email
+              <input id="new_p_email" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="name@example.com"/>
+            </label>
+            <label class="text-sm">Birthday (YYYY-MM-DD)
+              <input id="new_p_bday" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="1986-05-17"/>
+            </label>
+            <!-- role removed for 1-person households -->
+          </div>
+        </details>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="cancelCreateBtn" class="px-3 py-2 rounded-lg bg-slate-200">Cancel</button>
+          <button type="submit" id="createBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, get, child, push, set, update } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // 🔧 Your Firebase config (as given)
+    // 1) 🔧 Firebase config (yours)
     const firebaseConfig = {
       apiKey: "AIzaSyAMio_EgHUFYi6-MxwlCdWoXEBsGxPPccU",
       authDomain: "keykraft-1fca4.firebaseapp.com",
@@ -53,17 +128,38 @@
       measurementId: "G-SJLXJS3784"
     };
 
-    // Init
+    // 2) Init
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
-    // UI handles
+    // 3) UI handles
     const errEl  = document.getElementById("error");
+    const statusEl = document.getElementById("status");
     const grid   = document.getElementById("grid");
     const qEl    = document.getElementById("q");
     const odEl   = document.getElementById("overdue");
 
-    // Helpers
+    const openAddBtn = document.getElementById("openAddBtn");
+    const closeAddBtn = document.getElementById("closeAddBtn");
+    const cancelCreateBtn = document.getElementById("cancelCreateBtn");
+    const hhModal = document.getElementById("hhModal");
+    const form  = document.getElementById("hhCreateForm");
+
+    // Household name auto-fill from person first+last (until user types their own)
+    const hhNameEl = document.getElementById("new_hh_name");
+    const pFirstEl = document.getElementById("new_p_first");
+    const pLastEl  = document.getElementById("new_p_last");
+    let autoName = true;
+    hhNameEl.addEventListener("input", () => { autoName = hhNameEl.value.trim() === ""; });
+    function syncHhNameFromPerson(){
+      if (!autoName) return;
+      const nm = `${(pFirstEl.value||"").trim()} ${(pLastEl.value||"").trim()}`.trim();
+      hhNameEl.value = nm;
+    }
+    pFirstEl.addEventListener("input", syncHhNameFromPerson);
+    pLastEl.addEventListener("input",  syncHhNameFromPerson);
+
+    // 4) Helpers
     const today = new Date();
     const toISO = (d)=> d.toISOString().slice(0,10);
     function fmt(d){
@@ -74,8 +170,9 @@
     function chip(txt){
       return `<span class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border">${txt}</span>`;
     }
+    const splitList = (s="") => (s||"").split(/[,;]+/).map(t=>t.trim()).filter(Boolean);
 
-    // Load households
+    // 5) Load households
     let households = {};
     async function loadHouseholds(){
       try {
@@ -89,7 +186,7 @@
       }
     }
 
-    // Member names: use cache or fetch a few person records
+    // 6) Member names: prefer cache; else fetch
     async function hydrateMemberNames(hhObj){
       const entries = Object.entries(hhObj || {});
       for (const [id, hh] of entries) {
@@ -115,7 +212,7 @@
       }
     }
 
-    // Filtering + sorting
+    // 7) Filtering + sorting
     function matches(hh, q, overdueOnly){
       q = (q||"").trim().toLowerCase();
       if (overdueOnly){
@@ -142,26 +239,23 @@
       });
     }
 
-    // Card renderer
+    // 8) Card renderer -> use a plain anchor for navigation
     function card(id, hh){
-      const city = [hh?.address?.city, hh?.address?.state].filter(Boolean).join(", ");
+      const city = [hh && hh.address && hh.address.city, hh && hh.address && hh.address.state].filter(Boolean).join(", ");
       const tags = (hh.tags||[]).slice(0,4).map(chip).join(" ");
       const members = (hh._memberNames||[]).slice(0,4).map(n=>{
-        const first = n.split(" ")[0] || n; // show first name as chip
+        const first = (n||"").split(" ")[0] || n;
         return chip(first);
       }).join(" ");
 
       return `
-      <a href="./household.html?id=${encodeURIComponent(id)}"
-         class="block bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition">
+      <a href="./household.html?id=${encodeURIComponent(id)}" class="block bg-white border rounded-2xl shadow-sm p-4 hover:shadow-md transition">
         <div class="flex items-center justify-between gap-3">
-          <h3 class="font-semibold truncate" title="${hh.displayName||'Household'}">
-            ${hh.displayName || "Household"}
-          </h3>
+          <h3 class="font-semibold truncate" title="${hh.displayName||'Household'}">${hh.displayName || 'Household'}</h3>
           <span class="text-xs px-2 py-1 rounded bg-slate-100 border">Household</span>
         </div>
-        <div class="text-sm text-slate-600 mt-1">${city || "—"}</div>
-        <div class="mt-3 flex flex-wrap gap-1.5">${members || ""}</div>
+        <div class="text-sm text-slate-600 mt-1">${city || '—'}</div>
+        <div class="mt-3 flex flex-wrap gap-1.5">${members || ''}</div>
         <div class="mt-2 flex flex-wrap gap-1.5">${tags}</div>
         <div class="mt-3 text-xs text-slate-600">
           <div><span class="font-medium">Last:</span> ${fmt(hh.lastTouch)}</div>
@@ -170,7 +264,7 @@
       </a>`;
     }
 
-    // Render
+    // 9) Render
     function render(){
       const q = qEl.value;
       const overdueOnly = odEl.checked;
@@ -183,9 +277,95 @@
         `<div class="col-span-full text-slate-600">No households match your filters.</div>`;
     }
 
-    // Wire up filters
+    // 10) Wire up filters
     qEl.addEventListener("input", render);
     odEl.addEventListener("change", render);
+
+    // 11) Modal handlers (toggle the hidden attribute)
+    function openModal(){ hhModal.hidden = false; form.reset(); autoName = true; }
+    function closeModal(){ hhModal.hidden = true; }
+    openAddBtn.onclick = openModal;
+    closeAddBtn.onclick = closeModal;
+    cancelCreateBtn.onclick = closeModal;
+
+    // 12) Create household + optional first person (no role for single person)
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      errEl.textContent = ""; statusEl.textContent = "Creating household…";
+
+      // Household fields
+      const hhName = document.getElementById("new_hh_name").value.trim();
+      const cadence = Number(document.getElementById("new_cadence").value || 0);
+      const street = document.getElementById("new_street").value.trim();
+      const city   = document.getElementById("new_city").value.trim();
+      const state  = document.getElementById("new_state").value.trim();
+      const zip    = document.getElementById("new_zip").value.trim();
+      const tags   = splitList(document.getElementById("new_tags").value);
+
+      // Person fields (optional)
+      const pFirst = document.getElementById("new_p_first").value.trim();
+      const pLast  = document.getElementById("new_p_last").value.trim();
+      const pMob   = document.getElementById("new_p_mobile").value.trim();
+      const pEmail = document.getElementById("new_p_email").value.trim();
+      const pBday  = document.getElementById("new_p_bday").value.trim();
+
+      if (!hhName && !(pFirst || pLast)) {
+        errEl.textContent = "Please provide a household name, or at least the first person’s name.";
+        return;
+      }
+
+      try {
+        // Create household
+        const hhRef = push(ref(db, "households"));
+        const hhId = hhRef.key;
+        const baseName = hhName || `${pFirst} ${pLast}`.trim() || "Household";
+
+        const hhData = {
+          displayName: baseName,
+          address: { street, city, state, zip },
+          tags,
+          cadenceDays: cadence || null,
+          lastTouch: null,
+          nextSuggestedTouch: null,
+          members: {},
+          notes: "",
+          memberNamesCache: []
+        };
+
+        await set(hhRef, hhData);
+
+        // Optionally create first person and link (no role; mark primary)
+        let memberNames = [];
+        if (pFirst || pLast || pMob || pEmail || pBday) {
+          const pRef = push(ref(db, "people"));
+          const pid = pRef.key;
+          await set(pRef, {
+            firstName: pFirst, lastName: pLast, preferredName: pFirst || "",
+            phones: pMob ? [{ value: pMob, label: "mobile", isPrimary: true }] : [],
+            emails: pEmail ? [{ value: pEmail, label: "personal", isPrimary: true }] : [],
+            birthday: pBday || "",
+            interests: [],
+            preferredChannel: "",
+            custom: {}
+          });
+
+          memberNames = [`${pFirst} ${pLast}`.trim()].filter(Boolean);
+          await update(ref(db), {
+            [`/households/${hhId}/members/${pid}`]: { isPrimary: true },
+            [`/households/${hhId}/memberNamesCache`]: memberNames
+          });
+        }
+
+        closeModal();
+        statusEl.textContent = "Household created.";
+        await loadHouseholds();
+        // Jump straight to the new household
+        location.href = `./household.html?id=${hhRef.key}`;
+      } catch (e) {
+        errEl.textContent = e.message || String(e);
+        statusEl.textContent = "";
+      }
+    };
 
     // Go!
     loadHouseholds();
