@@ -12,7 +12,6 @@
     <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
       <h1 class="text-xl font-semibold">Sphere</h1>
       <nav class="text-sm">
-        <!-- Optional: point to your detail page -->
         <a class="underline opacity-80" href="./household.html?id=hh_demo">Open demo household</a>
       </nav>
     </div>
@@ -42,26 +41,29 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // 1) 🔧 Replace with your Firebase config
+    // 🔧 Your Firebase config (as given)
     const firebaseConfig = {
-      apiKey:      "YOUR_API_KEY",
-      authDomain:  "YOUR_PROJECT.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-      projectId:   "YOUR_PROJECT",
-      appId:       "YOUR_APP_ID"
+      apiKey: "AIzaSyAMio_EgHUFYi6-MxwlCdWoXEBsGxPPccU",
+      authDomain: "keykraft-1fca4.firebaseapp.com",
+      databaseURL: "https://keykraft-1fca4-default-rtdb.firebaseio.com",
+      projectId: "keykraft-1fca4",
+      storageBucket: "keykraft-1fca4.firebasestorage.app",
+      messagingSenderId: "525295374203",
+      appId: "1:525295374203:web:29a0484fc9e8b8ade1f7de",
+      measurementId: "G-SJLXJS3784"
     };
 
-    // 2) Init
+    // Init
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
-    // 3) UI handles
+    // UI handles
     const errEl  = document.getElementById("error");
     const grid   = document.getElementById("grid");
     const qEl    = document.getElementById("q");
     const odEl   = document.getElementById("overdue");
 
-    // 4) Helpers
+    // Helpers
     const today = new Date();
     const toISO = (d)=> d.toISOString().slice(0,10);
     function fmt(d){
@@ -73,13 +75,12 @@
       return `<span class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border">${txt}</span>`;
     }
 
-    // 5) Load households
+    // Load households
     let households = {};
     async function loadHouseholds(){
       try {
         const snap = await get(ref(db, "households"));
         households = snap.exists() ? snap.val() : {};
-        // preload member name chips (best-effort)
         await hydrateMemberNames(households);
         render();
       } catch (e) {
@@ -88,10 +89,8 @@
       }
     }
 
-    // 6) Member names: prefer cached names; otherwise fetch a few person records
+    // Member names: use cache or fetch a few person records
     async function hydrateMemberNames(hhObj){
-      // If you keep a cache like household.memberNamesCache = ["Jamie Richards", ...]
-      // we'll use it. Otherwise, fetch up to 4 member Person records for display.
       const entries = Object.entries(hhObj || {});
       for (const [id, hh] of entries) {
         if (Array.isArray(hh.memberNamesCache) && hh.memberNamesCache.length){
@@ -116,7 +115,7 @@
       }
     }
 
-    // 7) Filtering + sorting
+    // Filtering + sorting
     function matches(hh, q, overdueOnly){
       q = (q||"").trim().toLowerCase();
       if (overdueOnly){
@@ -143,7 +142,7 @@
       });
     }
 
-    // 8) Card renderer
+    // Card renderer
     function card(id, hh){
       const city = [hh?.address?.city, hh?.address?.state].filter(Boolean).join(", ");
       const tags = (hh.tags||[]).slice(0,4).map(chip).join(" ");
@@ -162,10 +161,8 @@
           <span class="text-xs px-2 py-1 rounded bg-slate-100 border">Household</span>
         </div>
         <div class="text-sm text-slate-600 mt-1">${city || "—"}</div>
-
         <div class="mt-3 flex flex-wrap gap-1.5">${members || ""}</div>
         <div class="mt-2 flex flex-wrap gap-1.5">${tags}</div>
-
         <div class="mt-3 text-xs text-slate-600">
           <div><span class="font-medium">Last:</span> ${fmt(hh.lastTouch)}</div>
           <div><span class="font-medium">Next:</span> ${fmt(hh.nextSuggestedTouch)}</div>
@@ -173,7 +170,7 @@
       </a>`;
     }
 
-    // 9) Render
+    // Render
     function render(){
       const q = qEl.value;
       const overdueOnly = odEl.checked;
@@ -186,7 +183,7 @@
         `<div class="col-span-full text-slate-600">No households match your filters.</div>`;
     }
 
-    // 10) Wire up filters
+    // Wire up filters
     qEl.addEventListener("input", render);
     odEl.addEventListener("change", render);
 
