@@ -16,8 +16,9 @@
   </header>
 
   <main class="max-w-5xl mx-auto p-4 md:p-6">
-    <section id="hhCard" class="bg-white rounded-2xl border shadow-sm p-5 md:p-6">
-      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <!-- Household card -->
+    <section class="bg-white rounded-2xl border shadow-sm p-5 md:p-6">
+      <div class="flex items-start justify-between gap-4">
         <div>
           <h2 id="hhName" class="text-2xl font-semibold">Loading…</h2>
           <p id="hhAddr" class="text-sm text-slate-600 mt-1"></p>
@@ -30,39 +31,101 @@
         </div>
       </div>
 
+      <!-- Edit Household toggle -->
+      <div class="mt-4 flex gap-2">
+        <button id="editHhBtn" class="px-3 py-2 rounded-lg bg-slate-800 text-white">Edit household</button>
+        <button id="addPersonBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white">Add person</button>
+      </div>
+
+      <!-- Household edit form -->
+      <form id="hhForm" class="mt-4 hidden grid grid-cols-1 md:grid-cols-2 gap-3">
+        <label class="text-sm">Name
+          <input id="f_hhName" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm">Cadence (days)
+          <input id="f_cadence" type="number" min="0" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm md:col-span-2">Address – Street
+          <input id="f_street" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm">City
+          <input id="f_city" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm">State
+          <input id="f_state" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm">ZIP
+          <input id="f_zip" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm md:col-span-2">Tags (comma or semicolon separated)
+          <input id="f_tags" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="north_shore;newsletter"/>
+        </label>
+        <div class="md:col-span-2 flex gap-2">
+          <button id="saveHhBtn" type="button" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Save household</button>
+          <button id="cancelHhBtn" type="button" class="px-3 py-2 rounded-lg bg-slate-200">Cancel</button>
+        </div>
+      </form>
+
       <div class="mt-6">
         <h3 class="font-semibold mb-2">Notes</h3>
         <p id="hhNotes" class="text-sm text-slate-700 bg-slate-50 rounded-lg p-3 min-h-[3rem]">—</p>
       </div>
     </section>
 
+    <!-- Members -->
     <section class="mt-6">
-      <h3 class="font-semibold mb-3">Members</h3>
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold mb-3">Members</h3>
+      </div>
       <div id="membersGrid" class="grid sm:grid-cols-2 gap-4"></div>
     </section>
 
-    <section class="mt-6">
-      <h3 class="font-semibold mb-3">Recent Interactions</h3>
-      <ul id="hhInteractions" class="space-y-2"></ul>
+    <!-- Add Person form -->
+    <section id="addPersonForm" class="mt-6 hidden bg-white border rounded-2xl p-4">
+      <h3 class="font-semibold mb-3">Add person</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <label class="text-sm">First name
+          <input id="ap_first" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm">Last name
+          <input id="ap_last" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm">Mobile
+          <input id="ap_mobile" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="+14145550123 or (414) 555-0123"/>
+        </label>
+        <label class="text-sm">Email
+          <input id="ap_email" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="name@example.com"/>
+        </label>
+        <label class="text-sm">Birthday (YYYY-MM-DD)
+          <input id="ap_bday" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="1986-05-17"/>
+        </label>
+        <label class="text-sm">Interests (comma/semicolon separated)
+          <input id="ap_interests" class="mt-1 w-full rounded-lg border px-3 py-2"/>
+        </label>
+        <label class="text-sm">Role in household
+          <select id="ap_role" class="mt-1 w-full rounded-lg border px-3 py-2">
+            <option value="partner">partner</option>
+            <option value="child">child</option>
+            <option value="roommate">roommate</option>
+            <option value="other">other</option>
+          </select>
+        </label>
+      </div>
+      <div class="mt-3 flex gap-2">
+        <button id="ap_save" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Create & link</button>
+        <button id="ap_cancel" class="px-3 py-2 rounded-lg bg-slate-200">Cancel</button>
+      </div>
     </section>
 
     <p id="error" class="mt-6 text-sm text-red-700 hidden"></p>
+    <p id="status" class="mt-2 text-sm text-slate-700"></p>
   </main>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, child, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, child, get, update, set, push } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // Read ?id=... from URL (e.g., ?id=hh_demo)
-    const params = new URLSearchParams(location.search);
-    const hhId = params.get("id");
-    const errEl = document.getElementById("error");
-    if (!hhId) {
-      errEl.textContent = "Missing household id. Try: household.html?id=hh_demo";
-      errEl.classList.remove("hidden");
-    }
-
-    // Your Firebase config
+    // --- config (yours) ---
     const firebaseConfig = {
       apiKey: "AIzaSyAMio_EgHUFYi6-MxwlCdWoXEBsGxPPccU",
       authDomain: "keykraft-1fca4.firebaseapp.com",
@@ -73,79 +136,126 @@
       appId: "1:525295374203:web:29a0484fc9e8b8ade1f7de",
       measurementId: "G-SJLXJS3784"
     };
-
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
-    // Helpers
+    // --- utils ---
+    const params = new URLSearchParams(location.search);
+    const hhId = params.get("id");
+    const errEl = document.getElementById("error");
+    const statusEl = document.getElementById("status");
+
     const fmtDate = (d) => {
       if (!d) return "—";
       const [y,m,day] = (d||"").split("-").map(Number);
       return (!y||!m||!day) ? d : `${m}/${day}/${y}`;
     };
-    const chip = (txt) =>
-      `<span class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border">${txt}</span>`;
-    const fmtAddr = (a={}) =>
-      [a.street, a.unit, [a.city, a.state].filter(Boolean).join(", "), a.zip]
-        .filter(Boolean).join(", ");
+    const chip = (txt) => `<span class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border">${txt}</span>`;
+    const fmtAddr = (a={}) => [a.street, a.unit, [a.city, a.state].filter(Boolean).join(", "), a.zip].filter(Boolean).join(", ");
+    const splitList = (s="") => (s||"").split(/[,;]+/).map(x=>x.trim()).filter(Boolean);
 
-    // Renderers
-    function renderHousehold(hh){
+    // --- state ---
+    let hh = null;
+    let members = []; // [{id, ...person}]
+
+    // --- render household ---
+    function renderHousehold(){
       document.getElementById("hhName").textContent = hh.displayName || "Household";
-      document.getElementById("hhAddr").textContent = fmtAddr(hh.address);
+      document.getElementById("hhAddr").textContent = fmtAddr(hh.address||{});
       document.getElementById("hhCadence").textContent = hh.cadenceDays ? `${hh.cadenceDays} days` : "—";
       document.getElementById("hhLast").textContent = fmtDate(hh.lastTouch);
       document.getElementById("hhNext").textContent = fmtDate(hh.nextSuggestedTouch);
       document.getElementById("hhTags").innerHTML = (hh.tags||[]).slice(0,8).map(chip).join(" ");
       document.getElementById("hhNotes").textContent = hh.notes || "—";
 
-      const interactions = (hh.interactions||[]).slice().sort((a,b)=> (a.date<b.date?1:-1));
-      document.getElementById("hhInteractions").innerHTML =
-        interactions.length
-          ? interactions.map(ix => `
-              <li class="p-3 bg-white border rounded-lg">
-                <div class="text-xs text-slate-500">${fmtDate(ix.date)} • ${ix.type||"touch"}</div>
-                <div class="text-sm">${ix.note||""}</div>
-              </li>`).join("")
-          : `<li class="text-sm text-slate-600">No interactions yet.</li>`;
+      // Pre-fill edit form
+      document.getElementById("f_hhName").value = hh.displayName || "";
+      document.getElementById("f_cadence").value = hh.cadenceDays ?? "";
+      document.getElementById("f_street").value  = hh.address?.street || "";
+      document.getElementById("f_city").value    = hh.address?.city || "";
+      document.getElementById("f_state").value   = hh.address?.state || "";
+      document.getElementById("f_zip").value     = hh.address?.zip || "";
+      document.getElementById("f_tags").value    = (hh.tags||[]).join(", ");
     }
 
-    function renderMembers(list){
+    // --- render members with inline edit forms ---
+    function renderMembers(){
       const grid = document.getElementById("membersGrid");
-      if (!list.length){
+      if (!members.length){
         grid.innerHTML = `<div class="text-slate-600">No members yet.</div>`;
         return;
       }
-      grid.innerHTML = list.map(p => {
+      grid.innerHTML = members.map(p => {
         const name = [p.preferredName||p.firstName, p.lastName].filter(Boolean).join(" ");
-        const phones = (p.phones||[]).map(ph => `<div>${ph.label||"phone"}: <a class="underline" href="tel:${ph.value}">${ph.value}</a></div>`).join("");
-        const emails = (p.emails||[]).map(em => `<div>${em.label||"email"}: <a class="underline" href="mailto:${em.value}">${em.value}</a></div>`).join("");
+        const phone0 = p.phones?.[0]?.value || "";
+        const email0 = p.emails?.[0]?.value || "";
         const interests = (p.interests||[]).slice(0,6).map(chip).join(" ");
+
         return `
-          <div class="bg-white border rounded-2xl p-4">
+          <div class="bg-white border rounded-2xl p-4" id="card_${p.id}">
             <div class="flex items-center justify-between">
               <h4 class="font-semibold">${name || "Unnamed"}</h4>
-              <span class="text-xs px-2 py-1 rounded bg-slate-100 border">Person</span>
+              <div class="flex gap-2">
+                <button data-pid="${p.id}" class="btnEditPerson text-xs px-2 py-1 rounded bg-slate-100 border">Edit</button>
+              </div>
             </div>
             <div class="text-sm text-slate-600 mt-1">Birthday: ${fmtDate(p.birthday)}</div>
             <div class="text-sm mt-2 space-y-1">
-              ${phones || ""}
-              ${emails || ""}
+              ${phone0 ? `<div>mobile: <a class="underline" href="tel:${phone0}">${phone0}</a></div>` : ""}
+              ${email0 ? `<div>email: <a class="underline" href="mailto:${email0}">${email0}</a></div>` : ""}
             </div>
             <div class="mt-2 flex flex-wrap gap-1.5">${interests}</div>
+
+            <!-- inline edit form (hidden by default) -->
+            <form id="form_${p.id}" class="mt-3 hidden grid grid-cols-1 gap-2 text-sm">
+              <div class="grid grid-cols-2 gap-2">
+                <input id="fn_${p.id}" class="rounded-lg border px-2 py-1" placeholder="First name" value="${p.firstName||""}"/>
+                <input id="ln_${p.id}" class="rounded-lg border px-2 py-1" placeholder="Last name" value="${p.lastName||""}"/>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <input id="ph_${p.id}" class="rounded-lg border px-2 py-1" placeholder="Mobile" value="${phone0}"/>
+                <input id="em_${p.id}" class="rounded-lg border px-2 py-1" placeholder="Email" value="${email0}"/>
+              </div>
+              <input id="bd_${p.id}" class="rounded-lg border px-2 py-1" placeholder="YYYY-MM-DD" value="${p.birthday||""}"/>
+              <input id="in_${p.id}" class="rounded-lg border px-2 py-1" placeholder="Interests (comma/semicolon)" value="${(p.interests||[]).join(", ")}"/>
+              <div class="flex gap-2">
+                <button data-pid="${p.id}" class="btnSavePerson px-3 py-1 rounded bg-emerald-600 text-white" type="button">Save person</button>
+                <button data-pid="${p.id}" class="btnCancelPerson px-3 py-1 rounded bg-slate-200" type="button">Cancel</button>
+              </div>
+            </form>
           </div>
         `;
       }).join("");
+
+      // wire buttons
+      grid.querySelectorAll(".btnEditPerson").forEach(btn=>{
+        btn.onclick = () => {
+          const pid = btn.getAttribute("data-pid");
+          document.getElementById(`form_${pid}`).classList.remove("hidden");
+        };
+      });
+      grid.querySelectorAll(".btnCancelPerson").forEach(btn=>{
+        btn.onclick = () => {
+          const pid = btn.getAttribute("data-pid");
+          document.getElementById(`form_${pid}`).classList.add("hidden");
+        };
+      });
+      grid.querySelectorAll(".btnSavePerson").forEach(btn=>{
+        btn.onclick = async () => {
+          const pid = btn.getAttribute("data-pid");
+          await savePerson(pid);
+        };
+      });
     }
 
-    // Load data
+    // --- load data ---
     async function load(){
       try {
         const hhSnap = await get(child(ref(db), `households/${hhId}`));
         if (!hhSnap.exists()) throw new Error(`Household "${hhId}" not found.`);
-        const hh = hhSnap.val();
+        hh = { id: hhId, ...hhSnap.val() };
 
-        // Fetch people (use cache if present)
+        // fetch people
         const memberIds = Object.keys(hh.members||{});
         const people = await Promise.all(memberIds.map(async pid => {
           try {
@@ -153,17 +263,141 @@
             return ps.exists() ? { id: pid, ...ps.val() } : null;
           } catch { return null; }
         }));
-        const members = people.filter(Boolean);
+        members = people.filter(Boolean);
 
-        renderHousehold(hh);
-        renderMembers(members);
+        renderHousehold();
+        renderMembers();
       } catch (e) {
         errEl.textContent = e.message;
         errEl.classList.remove("hidden");
       }
     }
 
-    if (hhId) load();
+    // --- household edit handlers ---
+    const hhForm = document.getElementById("hhForm");
+    document.getElementById("editHhBtn").onclick = ()=> hhForm.classList.toggle("hidden");
+    document.getElementById("cancelHhBtn").onclick = ()=> hhForm.classList.add("hidden");
+
+    document.getElementById("saveHhBtn").onclick = async () => {
+      try {
+        statusEl.textContent = "Saving household…";
+        const name = document.getElementById("f_hhName").value.trim();
+        const cadence = Number(document.getElementById("f_cadence").value || 0);
+        const street = document.getElementById("f_street").value.trim();
+        const city   = document.getElementById("f_city").value.trim();
+        const state  = document.getElementById("f_state").value.trim();
+        const zip    = document.getElementById("f_zip").value.trim();
+        const tags   = splitList(document.getElementById("f_tags").value);
+
+        const updates = {};
+        updates[`/households/${hhId}/displayName`] = name || hh.displayName || "Household";
+        updates[`/households/${hhId}/cadenceDays`] = cadence || null;
+        updates[`/households/${hhId}/address`] = { street, city, state, zip };
+        updates[`/households/${hhId}/tags`] = tags;
+
+        await update(ref(db), updates);
+        hhForm.classList.add("hidden");
+        await load(); // refresh
+        statusEl.textContent = "Household saved.";
+      } catch (e) {
+        errEl.textContent = e.message || String(e);
+        errEl.classList.remove("hidden");
+        statusEl.textContent = "";
+      }
+    };
+
+    // --- add person ---
+    const apSec = document.getElementById("addPersonForm");
+    document.getElementById("addPersonBtn").onclick = ()=> apSec.classList.toggle("hidden");
+    document.getElementById("ap_cancel").onclick = ()=> apSec.classList.add("hidden");
+
+    document.getElementById("ap_save").onclick = async () => {
+      try {
+        statusEl.textContent = "Creating person…";
+        const first = document.getElementById("ap_first").value.trim();
+        const last  = document.getElementById("ap_last").value.trim();
+        const mob   = document.getElementById("ap_mobile").value.trim();
+        const em    = document.getElementById("ap_email").value.trim();
+        const bday  = document.getElementById("ap_bday").value.trim();
+        const ints  = splitList(document.getElementById("ap_interests").value);
+        const role  = document.getElementById("ap_role").value;
+
+        const newRef = push(ref(db, "people"));
+        const pid = newRef.key;
+
+        await set(newRef, {
+          firstName: first, lastName: last, preferredName: first || "",
+          phones: mob ? [{ value: mob, label: "mobile", isPrimary: true }] : [],
+          emails: em  ? [{ value: em,  label: "personal", isPrimary: true }] : [],
+          birthday: bday || "",
+          interests: ints,
+          preferredChannel: "",
+          custom: {}
+        });
+
+        await update(ref(db), {
+          [`/households/${hhId}/members/${pid}`]: { role, isPrimary: false }
+        });
+
+        apSec.classList.add("hidden");
+        // clear fields
+        ["ap_first","ap_last","ap_mobile","ap_email","ap_bday","ap_interests"].forEach(id=>document.getElementById(id).value="");
+        await load();
+        statusEl.textContent = "Person added.";
+      } catch (e) {
+        errEl.textContent = e.message || String(e);
+        errEl.classList.remove("hidden");
+        statusEl.textContent = "";
+      }
+    };
+
+    // --- save existing person ---
+    async function savePerson(pid){
+      try {
+        statusEl.textContent = "Saving person…";
+        const fn = document.getElementById(`fn_${pid}`).value.trim();
+        const ln = document.getElementById(`ln_${pid}`).value.trim();
+        const ph = document.getElementById(`ph_${pid}`).value.trim();
+        const em = document.getElementById(`em_${pid}`).value.trim();
+        const bd = document.getElementById(`bd_${pid}`).value.trim();
+        const ins = splitList(document.getElementById(`in_${pid}`).value);
+
+        const updates = {};
+        updates[`/people/${pid}/firstName`] = fn;
+        updates[`/people/${pid}/lastName`]  = ln;
+        updates[`/people/${pid}/preferredName`] = fn || "";
+        updates[`/people/${pid}/phones`] = ph ? [{ value: ph, label: "mobile", isPrimary: true }] : [];
+        updates[`/people/${pid}/emails`] = em ? [{ value: em, label: "personal", isPrimary: true }] : [];
+        updates[`/people/${pid}/birthday`] = bd || "";
+        updates[`/people/${pid}/interests`] = ins;
+
+        await update(ref(db), updates);
+        document.getElementById(`form_${pid}`).classList.add("hidden");
+
+        // refresh member name cache on the household
+        const names = members.map(p=>{
+          if (p.id===pid){ return `${fn||p.firstName||""} ${ln||p.lastName||""}`.trim(); }
+          const f = p.preferredName||p.firstName||""; const l=p.lastName||"";
+          return `${f} ${l}`.trim();
+        }).filter(Boolean);
+        await update(ref(db), { [`/households/${hhId}/memberNamesCache`]: names });
+
+        await load();
+        statusEl.textContent = "Person saved.";
+      } catch (e) {
+        errEl.textContent = e.message || String(e);
+        errEl.classList.remove("hidden");
+        statusEl.textContent = "";
+      }
+    }
+
+    // go
+    if (!hhId) {
+      errEl.textContent = "Missing household id. Try: household.html?id=hh_demo";
+      errEl.classList.remove("hidden");
+    } else {
+      load();
+    }
   </script>
 </body>
 </html>
